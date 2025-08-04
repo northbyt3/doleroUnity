@@ -9,6 +9,8 @@ public class PlayerHealth : MonoBehaviour
     public List<Image> hearts;
     public GameObject heartPrefab;
     public Transform container;
+
+    private int heartIndex = 2;
     // Start is called before the first frame update
     void Start()
     {
@@ -20,11 +22,21 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            TakeDamage();
+        }
+    }
+
     public void TakeDamage()
     {
-        Destroy(hearts[0].gameObject);
-        hearts.RemoveAt(0);
-        if (hearts.Count <= 0)
+        hearts[heartIndex].GetComponent<Animator>().Play("Heart_Damage");
+        heartIndex--;
+        //Destroy(hearts[0].gameObject);
+        //hearts.RemoveAt(0);
+        if (heartIndex <= -1)
         {
             //Trigger End Match
         }
