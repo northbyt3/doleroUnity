@@ -20,7 +20,7 @@ public class GameManager : MonoBehaviour
     private bool hasPlayerChosenRelic, hasEnemyChosenRelic;
     private bool hasTimerEnded = false;
 
-
+    private string timerString;
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Space))
@@ -32,7 +32,8 @@ public class GameManager : MonoBehaviour
             timer -= Time.deltaTime;
             if (timer > 0)
             {
-                timerText.text = timer.ToString() + " sec";
+                timerString = timer.ToString("00.00");
+                timerText.text = timerString + " sec";
                 currentTime = Mathf.Clamp(timer, 0, maxTime);
                 slider.value = currentTime / maxTime;
             }
