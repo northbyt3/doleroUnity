@@ -147,7 +147,10 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
             return;
 
         if (wasDragged)
+        {
             return;
+        }
+            
 
         selected = !selected;
         SelectEvent.Invoke(this, selected);
@@ -156,11 +159,6 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
             transform.localPosition += (cardVisual.transform.up * selectionOffset);
         else
             transform.localPosition = Vector3.zero;
-    }
-
-    public void SelectionMaster()
-    {
-        transform.localPosition += cardVisual.transform.up * selectionOffset;
     }
 
     public void Deselect()

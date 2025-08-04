@@ -9,6 +9,11 @@ public class RelicsManager : MonoBehaviour
     {
         relicsDeck.EraseDeck();
         playerDeck.SetupDeck();
+    }
 
+    public void SkipButton()
+    {
+        relicsDeck.EraseDeck();
+        playerDeck.SetupDeck();
     }
 }
