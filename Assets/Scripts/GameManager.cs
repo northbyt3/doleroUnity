@@ -20,6 +20,8 @@ public class GameManager : MonoBehaviour
     private bool hasPlayerChosenRelic, hasEnemyChosenRelic;
     private bool hasTimerEnded = false;
 
+    public GameObject victoryScreen, defeatScreen;
+
     private string timerString;
     void Update()
     {
@@ -57,5 +59,8 @@ public class GameManager : MonoBehaviour
         StandEvent.Invoke();
     }
 
- 
+    public void VictoryScreen()
+    {
+        
+    }
 }
