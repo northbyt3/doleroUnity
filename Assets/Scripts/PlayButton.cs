@@ -57,7 +57,7 @@ public class PlayButton : MonoBehaviour
             {
                 Debug.Log(" not selected!");
             }
-            card.transform.localPosition += card.cardVisual.transform.up * 150;
+            card.transform.localPosition += card.cardVisual.transform.up * 75;
         }
     }
 }
