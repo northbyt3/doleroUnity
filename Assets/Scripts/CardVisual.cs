@@ -61,14 +61,17 @@ public class CardVisual : MonoBehaviour
     [Header("Curve")]
     [SerializeField] private CurveParameters curve;
     [SerializeField] private CardSpriteDatabase database;
+    [SerializeField] private Sprite turnedCard;
 
     private float curveYOffset;
     private float curveRotationOffset;
     private Coroutine pressCoroutine;
 
+    private Animator anim;
     private void Start()
     {
         shadowDistance = visualShadow.localPosition;
+        anim = GetComponentInChildren<Animator>();
     }
 
     public void Initialize(Card target, int index = 0)
@@ -93,10 +96,38 @@ public class CardVisual : MonoBehaviour
         initalize = true;
     }
 
-     public void SetCardVisual(int rank, int suit)
+    Sprite oldSprite;
+    public void TurnCardDown()
+    {
+        StartCoroutine(TurnCardDownCoroutine());
+    }
+
+    public void TurnCardUp()
+    {
+        StartCoroutine(TurnCardUpCoroutine());
+    }
+
+    IEnumerator TurnCardUpCoroutine()
+    {
+        anim.Play("Card_Turn");
+        yield return new WaitForSeconds(0.15f);
+        cardImage.sprite = oldSprite;
+        anim.Play("Card_FaceUpTurnSprite");
+    }
+
+    IEnumerator TurnCardDownCoroutine()
+    {
+        anim.Play("Card_Turn");
+        yield return new WaitForSeconds(0.15f);
+        cardImage.sprite = turnedCard;
+        anim.Play("Card_FaceUpTurnSprite");
+    }
+
+    public void SetCardVisual(int rank, int suit)
     {
         Sprite sprite = database.GetSprite(rank, suit);
         cardImage.sprite = sprite;
+        oldSprite = sprite;
     }
     public void UpdateIndex(int length)
     {
@@ -111,6 +142,14 @@ public class CardVisual : MonoBehaviour
         SmoothFollow();
         FollowRotation();
         CardTilt();
+         if (Input.GetKeyDown(KeyCode.I))
+        {
+            TurnCardDown();
+        }
+        else if (Input.GetKeyDown(KeyCode.O))
+        {
+            TurnCardUp();
+        }
 
     }
 

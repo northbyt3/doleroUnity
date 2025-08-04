@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8110481357869007721}
   - component: {fileID: 7697484841366769644}
   - component: {fileID: 502704179870035794}
+  - component: {fileID: 8236622626075613253}
   m_Layer: 5
   m_Name: Sprite
   m_TagString: Untagged
@@ -66,7 +67,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -818687841, guid: 4a817a797b7711742b6d8b143ba77374, type: 3}
+  m_Sprite: {fileID: 2001806126, guid: 4a817a797b7711742b6d8b143ba77374, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -88,6 +89,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c641e54aacd14965bb97c1f098f53cd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!95 &8236622626075613253
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1145312962996155630}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: c78e01d728f76fd45b8e0a9cc13cfa9a, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &2017949772597159594
 GameObject:
   m_ObjectHideFlags: 0
@@ -375,6 +397,7 @@ MonoBehaviour:
   swapVibrato: 5
   curve: {fileID: 11400000, guid: d4dd399fb2dab44429d866dc2259bb4b, type: 2}
   database: {fileID: 11400000, guid: e9510afcf2d3a78469a2dc3074db7553, type: 2}
+  turnedCard: {fileID: -80556281, guid: 4a817a797b7711742b6d8b143ba77374, type: 3}
 --- !u!223 &4132845374223140069
 Canvas:
   m_ObjectHideFlags: 0
