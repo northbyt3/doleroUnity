@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
-using UnityEditor.VersionControl;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -27,12 +26,25 @@ public class GameManager : MonoBehaviour
     public GameObject victoryScreen, defeatScreen;
 
     private string timerString;
+
+    public static GameManager Instance;
+    public TMP_Text currentScoreText;
+
+    public HorizontalLayoutGroup playedCardsGroup;
+    public GameObject cardObject;
+    public GameObject raiseBetScreen;
+
+    void Awake()
+    {
+        Instance = this;
+    }
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Space))
         {
             hasEnemyChosenRelic = true;
-            FillScoreCardButton();
+            Test();
+            //FillScoreCardButton();
         }
         if (hasEnemyChosenRelic && !hasTimerEnded)
         {
@@ -69,31 +81,47 @@ public class GameManager : MonoBehaviour
 
     }
 
-    public void FillScoreCardButton()
+    public void FillScoreCardButton(int value)
     {
-        StartCoroutine(FillScoreCardCoroutine(currentScore));
+        StartCoroutine(FillScoreCardCoroutine(value));
     }
 
     IEnumerator FillScoreCardCoroutine(int scoreToFill)
     {
         //int i = 0;
-        for(int i = 0;  i <= scoreToFill;  i++)
+        for (int i = 0; i <= scoreToFill; i++)
         {
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(0.05f);
             Debug.Log("Chupe");
             FillScoreCard(i, scoreToFill);
-            
+
         }
-        
+
     }
 
     void FillScoreCard(int currentScore, int scoreToFill)
     {
         if (scoreToFill != 0)
         {
+            scoreCard.sprite = scoreCards[currentScore];
+            currentScoreText.text = currentScore.ToString();
             currentScore++;
             scoreToFill--;
-            scoreCard.sprite = scoreCards[currentScore];
+
         }
+    }
+
+    void Test()
+    {
+        Instantiate(cardObject, playedCardsGroup.transform);
+    }
+
+    public void OpenRaiseBetScreen()
+    {
+        raiseBetScreen.SetActive(true);
+    }
+    public void CloseRaiseBetScreen()
+    {
+        raiseBetScreen.SetActive(false);
     }
 }

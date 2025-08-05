@@ -1,4 +1,4 @@
-    using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using Unity.VisualScripting;
@@ -24,20 +24,24 @@ public class PlayButton : MonoBehaviour
 
             }
         }
-
         if (!anyCardSelected) return;
+        foreach (Card card in horizontalCardHolder.cards)
+        {
+            if (card.selected)
+            {
+                value += card.cardValue;
+            }
+            else
+            {
+                card.cardVisual.TurnCardDown();
+            }
+        }
+        GameManager.Instance.FillScoreCardButton(value);
+        
         ValueLoop();
 
-        if (value > 21)
-        {
-            Debug.Log("Failed! " + value);
-            playerHealth.TakeDamage();
-        }
-        else
-        {
-            Debug.Log("Won! " + value);
-        }
-        value = 0;
+
+        //value = 0;
     }
 
 
@@ -51,13 +55,13 @@ public class PlayButton : MonoBehaviour
                 value += card.cardValue;
                 card.Deselect();
                 ValueLoop();
-                
+                card.transform.localPosition += card.cardVisual.transform.up * 300;
             }
             else
             {
                 Debug.Log(" not selected!");
             }
-            card.transform.localPosition += card.cardVisual.transform.up * 75;
+            
         }
     }
 }

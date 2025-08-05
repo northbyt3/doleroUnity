@@ -55,7 +55,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 133173175211647385, guid: 38aa6ba35be5144dc931edb1e6e43818, type: 3}
       propertyPath: cardValue
-      value: A
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6964580406683806308, guid: 38aa6ba35be5144dc931edb1e6e43818, type: 3}
       propertyPath: m_Pivot.x
