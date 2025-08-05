@@ -92,6 +92,7 @@ MonoBehaviour:
   SelectEvent:
     m_PersistentCalls:
       m_Calls: []
+  isInteractable: 1
 --- !u!114 &7486306067316991545
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -30,9 +30,11 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance;
     public TMP_Text currentScoreText;
 
-    public HorizontalLayoutGroup playedCardsGroup;
+    public HorizontalCardHolder playerDeck;
     public GameObject cardObject;
     public GameObject raiseBetScreen;
+
+    public TMP_Text playerName, enemyName;
 
     void Awake()
     {
@@ -43,7 +45,7 @@ public class GameManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space))
         {
             hasEnemyChosenRelic = true;
-            Test();
+            //();
             //FillScoreCardButton();
         }
         if (hasEnemyChosenRelic && !hasTimerEnded)
@@ -81,8 +83,16 @@ public class GameManager : MonoBehaviour
 
     }
 
-    public void FillScoreCardButton(int value)
+    public void FillScoreCardButton()
     {
+        int value = 0;
+        foreach (Card card in playerDeck.cards)
+        {
+            if (card.isPlayed)
+            {
+                value += card.cardValue;
+            }
+        }
         StartCoroutine(FillScoreCardCoroutine(value));
     }
 
@@ -92,11 +102,8 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i <= scoreToFill; i++)
         {
             yield return new WaitForSeconds(0.05f);
-            Debug.Log("Chupe");
             FillScoreCard(i, scoreToFill);
-
         }
-
     }
 
     void FillScoreCard(int currentScore, int scoreToFill)
@@ -107,21 +114,44 @@ public class GameManager : MonoBehaviour
             currentScoreText.text = currentScore.ToString();
             currentScore++;
             scoreToFill--;
-
         }
     }
 
-    void Test()
+    public void EmptyScoreCardButton(int value)
     {
-        Instantiate(cardObject, playedCardsGroup.transform);
+        StartCoroutine(EmptyScoreCardCoroutine(value));
     }
 
-    public void OpenRaiseBetScreen()
+    IEnumerator EmptyScoreCardCoroutine(int scoreToFill)
     {
-        raiseBetScreen.SetActive(true);
+        //int i = 0;
+        for (int i = 0; i <= scoreToFill; i++)
+        {
+            yield return new WaitForSeconds(0.05f);
+            EmptyScoreCard(i, scoreToFill);
+        }
     }
-    public void CloseRaiseBetScreen()
+
+    public void EmptyScoreCard(int currentScore, int scoreToFill)
     {
-        raiseBetScreen.SetActive(false);
+        currentScore = 0;
+        scoreCard.sprite = scoreCards[currentScore];
+        currentScoreText.text = currentScore.ToString();
     }
+
+public void OpenRaiseBetScreen()
+{
+    raiseBetScreen.SetActive(true);
+}
+public void CloseRaiseBetScreen()
+{
+    raiseBetScreen.SetActive(false);
+}
+
+
+public void ChangeNames(string playerNameStr, string enemyNameStr)
+{
+    playerName.text = playerNameStr;
+    enemyName.text = enemyNameStr;
+}
 }

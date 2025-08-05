@@ -45,6 +45,10 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
     [HideInInspector] public UnityEvent<Card> EndDragEvent;
     [HideInInspector] public UnityEvent<Card, bool> SelectEvent;
 
+    public bool isInteractable = true;
+    public bool isDraggable = true;
+    public bool isPlayed;
+
     void Start()
     {
         canvas = GetComponentInParent<Canvas>();
@@ -82,6 +86,7 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        if (!isDraggable) return;
         BeginDragEvent.Invoke(this);
         Vector2 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         offset = mousePosition - (Vector2)transform.position;
@@ -98,6 +103,7 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
 
     public void OnEndDrag(PointerEventData eventData)
     {
+        if (!isDraggable) return;
         EndDragEvent.Invoke(this);
         isDragging = false;
         canvas.GetComponent<GraphicRaycaster>().enabled = true;
@@ -114,12 +120,14 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        if (!isInteractable) return;
         PointerEnterEvent.Invoke(this);
         isHovering = true;
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
+        if (!isInteractable) return;
         PointerExitEvent.Invoke(this);
         isHovering = false;
     }
@@ -127,6 +135,7 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
 
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (!isInteractable) return;
         if (eventData.button != PointerEventData.InputButton.Left)
             return;
 
@@ -136,6 +145,7 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
 
     public void OnPointerUp(PointerEventData eventData)
     {
+        if (!isInteractable) return;
         if (eventData.button != PointerEventData.InputButton.Left)
             return;
 
@@ -150,15 +160,22 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
         {
             return;
         }
-            
+
 
         selected = !selected;
         SelectEvent.Invoke(this, selected);
 
         if (selected)
+        {
             transform.localPosition += (cardVisual.transform.up * selectionOffset);
+        }
         else
+        {
             transform.localPosition = Vector3.zero;
+            Debug.Log("Eae");
+            //GameManager.Instance.EmptyScoreCard(0, 0);
+        }
+
     }
 
     public void Deselect()
@@ -166,10 +183,17 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
         if (selected)
         {
             selected = false;
+
             if (selected)
+            {
                 transform.localPosition += (cardVisual.transform.up * 50);
+            }
             else
+            {
                 transform.localPosition = Vector3.zero;
+
+            }
+
         }
     }
 
@@ -191,7 +215,7 @@ public class Card : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHand
 
     private void OnDestroy()
     {
-        if(cardVisual != null)
-        Destroy(cardVisual.gameObject);
+        if (cardVisual != null)
+            Destroy(cardVisual.gameObject);
     }
 }

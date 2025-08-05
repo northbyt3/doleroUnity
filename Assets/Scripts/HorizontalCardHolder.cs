@@ -26,6 +26,7 @@ public class HorizontalCardHolder : MonoBehaviour
     [SerializeField] private int swapsAvailable = 4;
     [SerializeField] private bool deckOnStart;
     [SerializeField] private int cardValueMin, cardValueMax, cardRankMin, cardRankMax;
+    public bool isInteractable, isDraggable;
 
     void Start()
     {
@@ -49,8 +50,20 @@ public class HorizontalCardHolder : MonoBehaviour
 
         foreach (Card card in cards)
         {
-            card.cardValue = UnityEngine.Random.Range(cardValueMin, cardValueMax);
-            card.cardRank = UnityEngine.Random.Range(cardRankMin, cardRankMax);
+            card.isInteractable = isInteractable;
+            card.isDraggable = isDraggable;
+
+            if (isInteractable)
+            {
+                card.cardValue = UnityEngine.Random.Range(cardValueMin, cardValueMax);
+                card.cardRank = UnityEngine.Random.Range(cardRankMin, cardRankMax);
+            }
+            else
+            {
+                card.cardValue = 20;
+                card.cardRank = 20;
+            }
+            
             card.PointerEnterEvent.AddListener(CardPointerEnter);
             card.PointerExitEvent.AddListener(CardPointerExit);
             card.BeginDragEvent.AddListener(BeginDrag);
@@ -74,6 +87,8 @@ public class HorizontalCardHolder : MonoBehaviour
 
     private void SetupCard(Card card)
     {
+        card.isInteractable = isInteractable;
+        card.isDraggable = isDraggable;
         card.cardValue = UnityEngine.Random.Range(1, 14);
         card.cardRank = UnityEngine.Random.Range(0, 4);
         card.PointerEnterEvent.AddListener(CardPointerEnter);
@@ -100,7 +115,7 @@ public class HorizontalCardHolder : MonoBehaviour
         bool anyCardSelected = false;
         foreach (Card card in cards)
         {
-            if (card.selected == true)
+            if (card.selected == true && !card.isPlayed)
             {
                 anyCardSelected = true;
             }
@@ -117,7 +132,7 @@ public class HorizontalCardHolder : MonoBehaviour
         for(int i = 0; i< cards.Count; i++)
         {
             Card card = cards[i];
-            if (card.selected)
+            if (card.selected && !card.isPlayed)
             {
                 GameObject c = Instantiate(slotPrefab, transform);
                 cards.Add(c.GetComponentInChildren<Card>());

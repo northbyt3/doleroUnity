@@ -8,7 +8,7 @@ public class PlayButton : MonoBehaviour
 {
     public HorizontalCardHolder horizontalCardHolder;
     public PlayerHealth playerHealth;
-    int value = 0;
+   public int value = 0;
     public void PlayButtonClick()
     {
         bool anyCardSelected = false;
@@ -30,31 +30,32 @@ public class PlayButton : MonoBehaviour
             if (card.selected)
             {
                 value += card.cardValue;
+                card.isInteractable = false;
+                card.isDraggable = false;
+                card.isPlayed = true;
+                ValueLoop(card);
             }
             else
             {
-                card.cardVisual.TurnCardDown();
+                //card.cardVisual.TurnCardDown();
             }
         }
-        GameManager.Instance.FillScoreCardButton(value);
+
+        GameManager.Instance.FillScoreCardButton();
         
-        ValueLoop();
 
 
         //value = 0;
     }
 
 
-    void ValueLoop()
+    void ValueLoop(Card card)
     {
-        for (int i = 0; i < horizontalCardHolder.cards.Count; i++)
-        {
-            Card card = horizontalCardHolder.cards[i];
             if (card.selected)
             {
                 value += card.cardValue;
                 card.Deselect();
-                ValueLoop();
+                //ValueLoop();
                 card.transform.localPosition += card.cardVisual.transform.up * 300;
             }
             else
@@ -64,4 +65,4 @@ public class PlayButton : MonoBehaviour
             
         }
     }
-}
+
