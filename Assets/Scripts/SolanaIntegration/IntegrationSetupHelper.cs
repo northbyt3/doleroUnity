@@ -170,17 +170,14 @@ public class IntegrationSetupHelper : MonoBehaviour
     [ContextMenu("Connect to Server")]
     public void ConnectToServer()
     {
-        // DISABLED - Use SimpleDirectWebSocket instead
-        Debug.Log("🔧 WebSocket connection disabled - use SimpleDirectWebSocket instead");
-        
-        // if (DoleroWebSocketClient.Instance != null)
-        // {
-        //     DoleroWebSocketClient.Instance.Connect();
-        // }
-        // else
-        // {
-        //     Debug.LogError("WebSocket client not found!");
-        // }
+        if (DoleroWebSocketClient.Instance != null)
+        {
+            DoleroWebSocketClient.Instance.Connect();
+        }
+        else
+        {
+            Debug.LogError("WebSocket client not found!");
+        }
     }
     
     [ContextMenu("Test Game Flow")]

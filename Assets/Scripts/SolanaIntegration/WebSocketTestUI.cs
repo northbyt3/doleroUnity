@@ -9,8 +9,10 @@ public class WebSocketTestUI : MonoBehaviour
 {
     [Header("UI References")]
     public Button connectButton;
+    public Button disconnectButton;
     public Button joinGameButton;
     public Button testMessageButton;
+    public Button pingButton;
     public TextMeshProUGUI statusText;
     public TextMeshProUGUI messagesText;
     
@@ -22,11 +24,17 @@ public class WebSocketTestUI : MonoBehaviour
         DoleroWebSocketClient.OnConnectionChanged += OnConnectionChanged;
         DoleroWebSocketClient.OnMessageReceived += OnMessageReceived;
         DoleroWebSocketClient.OnError += OnError;
+        DoleroWebSocketClient.OnGameStateUpdated += OnGameStateUpdated;
         
         // Setup buttons
         if (connectButton != null)
         {
             connectButton.onClick.AddListener(OnConnectClicked);
+        }
+        
+        if (disconnectButton != null)
+        {
+            disconnectButton.onClick.AddListener(OnDisconnectClicked);
         }
         
         if (joinGameButton != null)
@@ -41,60 +49,81 @@ public class WebSocketTestUI : MonoBehaviour
             testMessageButton.interactable = false;
         }
         
+        if (pingButton != null)
+        {
+            pingButton.onClick.AddListener(OnPingClicked);
+            pingButton.interactable = false;
+        }
+        
         UpdateStatus("Not Connected", Color.red);
     }
     
     void OnConnectClicked()
     {
-        // DISABLED - Use SimpleDirectWebSocket instead
-        Debug.Log("🔧 WebSocket connection disabled - use SimpleDirectWebSocket instead");
-        UpdateStatus("WebSocket disabled - use HTTP polling", Color.yellow);
-        
-        // if (DoleroWebSocketClient.Instance != null)
-        // {
-        //     if (!DoleroWebSocketClient.Instance.IsConnected)
-        //     {
-        //         DoleroWebSocketClient.Instance.Connect();
-        //         UpdateStatus("Connecting...", Color.yellow);
-        //     }
-        //     else
-        //     {
-        //         DoleroWebSocketClient.Instance.Disconnect();
-        //     }
-        // }
+        if (DoleroWebSocketClient.Instance != null)
+        {
+            if (!DoleroWebSocketClient.Instance.isConnected)
+            {
+                DoleroWebSocketClient.Instance.Connect();
+                UpdateStatus("Connecting...", Color.yellow);
+            }
+            else
+            {
+                DoleroWebSocketClient.Instance.Disconnect();
+            }
+        }
+        else
+        {
+            Debug.LogError("WebSocket client not found!");
+        }
+    }
+    
+    void OnDisconnectClicked()
+    {
+        if (DoleroWebSocketClient.Instance != null)
+        {
+            DoleroWebSocketClient.Instance.Disconnect();
+        }
     }
     
     void OnJoinGameClicked()
     {
-        // DISABLED - Use SimpleDirectWebSocket instead
-        Debug.Log("🔧 WebSocket functions disabled - use SimpleDirectWebSocket instead");
-        AddMessage("WebSocket disabled - use HTTP polling");
+        if (DoleroWebSocketClient.Instance != null && DoleroWebSocketClient.Instance.isConnected)
+        {
+            DoleroWebSocketClient.Instance.JoinGame("test-game-001");
+            AddMessage("Sent: Join Game");
+        }
     }
     
     void OnTestMessageClicked()
     {
-        // DISABLED - Use SimpleDirectWebSocket instead
-        Debug.Log("🔧 WebSocket functions disabled - use SimpleDirectWebSocket instead");
-        AddMessage("WebSocket disabled - use HTTP polling");
-        
-        // if (DoleroWebSocketClient.Instance != null && DoleroWebSocketClient.Instance.IsConnected)
-        // {
-        //     // Test various messages
-        //     DoleroWebSocketClient.Instance.RequestGameState();
-        //     AddMessage("Sent: Request Game State");
-        //     
-        //     // Test relic selection
-        //     DoleroWebSocketClient.Instance.SelectRelic(1);
-        //     AddMessage("Sent: Select Relic (High Stakes)");
-        //     
-        //     // Test card play
-        //     DoleroWebSocketClient.Instance.PlayCard(0, 1);
-        //     AddMessage("Sent: Play Card");
-        //     
-        //     // Test bet
-        //     DoleroWebSocketClient.Instance.PlaceBet("CALL");
-        //     AddMessage("Sent: Place Bet (CALL)");
-        // }
+        if (DoleroWebSocketClient.Instance != null && DoleroWebSocketClient.Instance.isConnected)
+        {
+            // Test various messages
+            DoleroWebSocketClient.Instance.RequestGameState();
+            AddMessage("Sent: Request Game State");
+            
+            // Test relic selection
+            DoleroWebSocketClient.Instance.SelectRelic(1);
+            AddMessage("Sent: Select Relic (High Stakes)");
+            
+            // Test card play
+            DoleroWebSocketClient.Instance.PlayCard(0, 1);
+            AddMessage("Sent: Play Card");
+            
+            // Test bet
+            DoleroWebSocketClient.Instance.PlaceBet("CALL");
+            AddMessage("Sent: Place Bet (CALL)");
+        }
+    }
+    
+    void OnPingClicked()
+    {
+        if (DoleroWebSocketClient.Instance != null && DoleroWebSocketClient.Instance.isConnected)
+        {
+            DoleroWebSocketClient.Instance.SendMessage("ping");
+            AddMessage("Sent: Ping");
+        }
     }
     
     void OnConnectionChanged(bool connected)
@@ -108,6 +137,7 @@ public class WebSocketTestUI : MonoBehaviour
             }
             if (joinGameButton != null) joinGameButton.interactable = true;
             if (testMessageButton != null) testMessageButton.interactable = true;
+            if (pingButton != null) pingButton.interactable = true;
         }
         else
         {
@@ -118,6 +148,7 @@ public class WebSocketTestUI : MonoBehaviour
             }
             if (joinGameButton != null) joinGameButton.interactable = false;
             if (testMessageButton != null) testMessageButton.interactable = false;
+            if (pingButton != null) pingButton.interactable = false;
         }
     }
     
@@ -131,6 +162,11 @@ public class WebSocketTestUI : MonoBehaviour
     {
         AddMessage($"ERROR: {error}");
         UpdateStatus($"Error: {error}", Color.red);
+    }
+    
+    void OnGameStateUpdated(DoleroWebSocketClient.GameStateUpdate state)
+    {
+        AddMessage($"Game State: Phase={state.phase}, Round={state.round}, Pot={state.pot}");
     }
     
     void UpdateStatus(string text, Color color)
@@ -167,5 +203,6 @@ public class WebSocketTestUI : MonoBehaviour
         DoleroWebSocketClient.OnConnectionChanged -= OnConnectionChanged;
         DoleroWebSocketClient.OnMessageReceived -= OnMessageReceived;
         DoleroWebSocketClient.OnError -= OnError;
+        DoleroWebSocketClient.OnGameStateUpdated -= OnGameStateUpdated;
     }
 }

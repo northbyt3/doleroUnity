@@ -4,46 +4,49 @@ using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
 
-// The Solana SDK already includes WebSocketSharp
-// We'll use it directly without additional imports
-
 /// <summary>
-/// Real WebSocket client for DOLERO using WebSocketSharp
-/// Handles real-time bidirectional communication with the Web2 delegate server
+/// WebSocket client for DOLERO server communication
+/// Connects to 174.138.42.117:3002
 /// </summary>
 public class DoleroWebSocketClient : MonoBehaviour
 {
     [Header("Connection Settings")]
-    [SerializeField] private string serverAddress = "174.138.42.117";
-    [SerializeField] private int wsPort = 3002; // WebSocket port
-    [SerializeField] private bool autoReconnect = true;
-    [SerializeField] private float reconnectDelay = 3f;
-    [SerializeField] private bool useSecureWebSocket = false; // KEEP THIS FALSE for ws://
+    public string serverAddress = "174.138.42.117";
+    public int wsPort = 3002;
+    public bool autoConnect = true;
+    public float reconnectDelay = 5f;
+    public int maxReconnectAttempts = 3;
     
-    [Header("Debug")]
-    [SerializeField] private bool debugMode = true;
-    
-    // WebSocket instance
-    private WebSocketSharp.WebSocket websocket;
-    private bool isConnecting = false;
-    private Coroutine reconnectCoroutine;
-    private Queue<Action> mainThreadActions = new Queue<Action>();
-    
-    // Player info
-    private string playerId;
-    private string gameId;
+    [Header("Status")]
+    public bool isConnected = false;
+    public string connectionStatus = "Disconnected";
+    public int reconnectAttempts = 0;
     
     // Events
     public static event Action<bool> OnConnectionChanged;
     public static event Action<string> OnMessageReceived;
     public static event Action<string> OnError;
     public static event Action<GameStateUpdate> OnGameStateUpdated;
-    public static event Action<string> OnPlayerJoined;
-    public static event Action<RelicSelectionData> OnRelicSelected;
-    public static event Action<CardPlayData> OnCardPlayed;
-    public static event Action<BetData> OnBetPlaced;
+    
+    // WebSocket instance
+    private WebSocketSharp.WebSocket websocket;
+    private Coroutine reconnectCoroutine;
+    private Queue<string> messageQueue = new Queue<string>();
+    private bool isReconnecting = false;
     
     public static DoleroWebSocketClient Instance { get; private set; }
+    
+    // Game state data structure
+    [Serializable]
+    public class GameStateUpdate
+    {
+        public string phase;
+        public int round;
+        public double pot;
+        public string[] players;
+        public string currentPlayer;
+        public double timeRemaining;
+    }
     
     void Awake()
     {
@@ -60,18 +63,9 @@ public class DoleroWebSocketClient : MonoBehaviour
     
     void Start()
     {
-        // Auto-connect on start - DISABLED due to Unity WebSocket security issues
-        // Connect();
-        Debug.Log("🔧 DoleroWebSocketClient disabled - use SimpleDirectWebSocket instead");
-    }
-    
-    void Update()
-    {
-        // Execute queued actions on main thread
-        while (mainThreadActions.Count > 0)
+        if (autoConnect)
         {
-            var action = mainThreadActions.Dequeue();
-            action?.Invoke();
+            Connect();
         }
     }
     
@@ -80,62 +74,47 @@ public class DoleroWebSocketClient : MonoBehaviour
     /// </summary>
     public void Connect()
     {
-        if (websocket != null && websocket.ReadyState == WebSocketSharp.WebSocketState.Open)
+        if (isConnected || isReconnecting)
         {
-            Debug.Log("Already connected to WebSocket server");
-            return;
-        }
-        
-        if (isConnecting)
-        {
-            Debug.Log("Connection already in progress");
+            Debug.Log("Already connected or connecting...");
             return;
         }
         
         StartCoroutine(ConnectCoroutine());
     }
     
-    private IEnumerator ConnectCoroutine()
+    IEnumerator ConnectCoroutine()
     {
-        isConnecting = true;
-        
-        // Construct WebSocket URL
-        string protocol = useSecureWebSocket ? "wss" : "ws";
-        string wsUrl = $"{protocol}://{serverAddress}:{wsPort}";
-        
-        Debug.Log($"🔌 Connecting to WebSocket server at {wsUrl}");
+        Debug.Log($"🔗 Connecting to WebSocket server at ws://{serverAddress}:{wsPort}");
+        connectionStatus = "Connecting...";
+        isReconnecting = true;
         
         bool connectionFailed = false;
         string errorMessage = "";
         
         try
         {
-            // Create WebSocket instance
+            // Create WebSocket connection
+            string wsUrl = $"ws://{serverAddress}:{wsPort}";
             websocket = new WebSocketSharp.WebSocket(wsUrl);
             
-            // Configure WebSocket for insecure connections if needed
-            if (!useSecureWebSocket)
-            {
-                // Allow insecure connections for development
-                if (websocket.SslConfiguration != null)
-                {
-                    websocket.SslConfiguration.ServerCertificateValidationCallback = 
-                        (sender, certificate, chain, sslPolicyErrors) => true;
-                }
-            }
+            // Configure WebSocket settings for insecure connections
+            websocket.SslConfiguration.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
+            websocket.SslConfiguration.EnabledSslProtocols = System.Security.Authentication.SslProtocols.None;
+            websocket.Log.Level = WebSocketSharp.LogLevel.Error;
             
-            // Configure WebSocket
+            // Additional security bypass for Unity
+            websocket.SslConfiguration.CheckCertificateRevocation = false;
+            websocket.SslConfiguration.ClientCertificates = null;
+            
+            // Subscribe to events
             websocket.OnOpen += OnWebSocketOpen;
             websocket.OnMessage += OnWebSocketMessage;
-            websocket.OnError += OnWebSocketError;
             websocket.OnClose += OnWebSocketClose;
+            websocket.OnError += OnWebSocketError;
             
-            // Set additional properties
-            websocket.WaitTime = System.TimeSpan.FromSeconds(5);
-            websocket.EmitOnPing = true;
-            
-            // Connect asynchronously
-            websocket.ConnectAsync();
+            // Connect
+            websocket.Connect();
         }
         catch (Exception e)
         {
@@ -143,407 +122,318 @@ public class DoleroWebSocketClient : MonoBehaviour
             errorMessage = e.Message;
         }
         
-        if (!connectionFailed)
+        // Wait for connection (outside try-catch)
+        float timeout = 10f;
+        float elapsed = 0f;
+        
+        while (!isConnected && elapsed < timeout && !connectionFailed)
         {
-            // Wait for connection (timeout after 5 seconds)
-            float timeout = 5f;
-            float elapsed = 0f;
-            
-            while (websocket != null && websocket.ReadyState == WebSocketSharp.WebSocketState.Connecting && elapsed < timeout)
-            {
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
-            
-            if (websocket == null || websocket.ReadyState != WebSocketSharp.WebSocketState.Open)
-            {
-                connectionFailed = true;
-                errorMessage = $"Connection timeout or failed. State: {websocket?.ReadyState}";
-            }
-            else
-            {
-                Debug.Log("✅ WebSocket connected successfully!");
-            }
+            elapsed += Time.deltaTime;
+            yield return null;
         }
         
         if (connectionFailed)
         {
             Debug.LogError($"❌ WebSocket connection failed: {errorMessage}");
-            QueueMainThreadAction(() => OnError?.Invoke($"Connection failed: {errorMessage}"));
-            
-            if (autoReconnect && reconnectCoroutine == null)
-            {
-                reconnectCoroutine = StartCoroutine(ReconnectCoroutine());
-            }
-        }
-        
-        isConnecting = false;
-    }
-    
-    #region WebSocket Event Handlers
-    
-    private void OnWebSocketOpen(object sender, EventArgs e)
-    {
-        Debug.Log("✅ WebSocket connection opened");
-        
-        QueueMainThreadAction(() =>
-        {
-            OnConnectionChanged?.Invoke(true);
-            
-            // Send initial handshake/authentication
-            SendHandshake();
-        });
-    }
-    
-    private void OnWebSocketMessage(object sender, WebSocketSharp.MessageEventArgs e)
-    {
-        if (debugMode)
-        {
-            Debug.Log($"📨 Received: {e.Data}");
-        }
-        
-        QueueMainThreadAction(() =>
-        {
-            OnMessageReceived?.Invoke(e.Data);
-            ProcessMessage(e.Data);
-        });
-    }
-    
-    private void OnWebSocketError(object sender, WebSocketSharp.ErrorEventArgs e)
-    {
-        Debug.LogError($"❌ WebSocket error: {e.Message}");
-        
-        QueueMainThreadAction(() =>
-        {
-            OnError?.Invoke(e.Message);
-        });
-    }
-    
-    private void OnWebSocketClose(object sender, WebSocketSharp.CloseEventArgs e)
-    {
-        Debug.Log($"🔌 WebSocket closed: {e.Reason} (Code: {e.Code})");
-        
-        QueueMainThreadAction(() =>
-        {
+            connectionStatus = $"Connection failed: {errorMessage}";
             OnConnectionChanged?.Invoke(false);
-            
-            if (autoReconnect && reconnectCoroutine == null)
-            {
-                reconnectCoroutine = StartCoroutine(ReconnectCoroutine());
-            }
+            OnError?.Invoke(errorMessage);
+        }
+        else if (!isConnected)
+        {
+            Debug.LogError("❌ WebSocket connection timeout");
+            connectionStatus = "Connection timeout";
+            OnConnectionChanged?.Invoke(false);
+        }
+        
+        isReconnecting = false;
+    }
+    
+    void OnWebSocketOpen(object sender, EventArgs e)
+    {
+        Debug.Log("✅ WebSocket connected!");
+        isConnected = true;
+        connectionStatus = "Connected";
+        reconnectAttempts = 0;
+        OnConnectionChanged?.Invoke(true);
+        
+        // Send initial connection message
+        SendMessage("connect", new
+        {
+            clientType = "Unity",
+            platform = Application.platform.ToString(),
+            version = Application.version,
+            timestamp = DateTime.UtcNow.ToString("o")
         });
     }
     
-    #endregion
-    
-    #region Message Processing
-    
-    private void ProcessMessage(string message)
+    void OnWebSocketMessage(object sender, WebSocketSharp.MessageEventArgs e)
     {
         try
         {
-            var msg = JsonConvert.DeserializeObject<WebSocketMessage>(message);
-            if (msg == null) return;
+            string message = e.Data;
+            Debug.Log($"📨 Received: {message}");
             
-            switch (msg.type)
+            // Parse message
+            var messageData = JsonConvert.DeserializeObject<Dictionary<string, object>>(message);
+            
+            if (messageData.ContainsKey("type"))
             {
-                case "connected":
-                    HandleConnected(msg);
-                    break;
-                case "gameState":
-                    HandleGameStateUpdate(msg);
-                    break;
-                case "playerJoined":
-                    HandlePlayerJoined(msg);
-                    break;
-                case "relicSelected":
-                    HandleRelicSelected(msg);
-                    break;
-                case "cardPlayed":
-                    HandleCardPlayed(msg);
-                    break;
-                case "cardSwapped":
-                    HandleCardSwapped(msg);
-                    break;
-                case "betPlaced":
-                    HandleBetPlaced(msg);
-                    break;
-                case "cardsRevealed":
-                    HandleCardsRevealed(msg);
-                    break;
-                case "roundEnd":
-                    HandleRoundEnd(msg);
-                    break;
-                case "error":
-                    HandleError(msg);
-                    break;
-                default:
-                    Debug.LogWarning($"Unknown message type: {msg.type}");
-                    break;
+                string messageType = messageData["type"].ToString();
+                
+                switch (messageType)
+                {
+                    case "gameState":
+                        HandleGameStateUpdate(messageData);
+                        break;
+                    case "error":
+                        HandleErrorMessage(messageData);
+                        break;
+                    case "pong":
+                        Debug.Log("🏓 Pong received");
+                        break;
+                    default:
+                        OnMessageReceived?.Invoke(message);
+                        break;
+                }
+            }
+            else
+            {
+                OnMessageReceived?.Invoke(message);
             }
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
-            Debug.LogError($"Failed to process message: {e.Message}\nMessage: {message}");
+            Debug.LogError($"❌ Failed to parse message: {ex.Message}");
+            OnError?.Invoke($"Message parsing error: {ex.Message}");
         }
     }
     
-    private void HandleConnected(WebSocketMessage msg)
+    void OnWebSocketClose(object sender, WebSocketSharp.CloseEventArgs e)
     {
-        Debug.Log("✅ Server acknowledged connection");
-        if (msg.data != null)
+        Debug.Log($"🔌 WebSocket closed: {e.Reason}");
+        isConnected = false;
+        connectionStatus = "Disconnected";
+        OnConnectionChanged?.Invoke(false);
+        
+        // Attempt to reconnect
+        if (reconnectAttempts < maxReconnectAttempts)
         {
-            var data = JsonConvert.DeserializeObject<Dictionary<string, object>>(msg.data.ToString());
-            if (data.ContainsKey("playerId"))
-            {
-                playerId = data["playerId"].ToString();
-                Debug.Log($"Assigned Player ID: {playerId}");
-            }
+            StartCoroutine(ReconnectCoroutine());
+        }
+        else
+        {
+            Debug.LogError("❌ Max reconnection attempts reached");
+            OnError?.Invoke("Max reconnection attempts reached");
         }
     }
     
-    private void HandleGameStateUpdate(WebSocketMessage msg)
+    void OnWebSocketError(object sender, WebSocketSharp.ErrorEventArgs e)
     {
-        var gameState = JsonConvert.DeserializeObject<GameStateUpdate>(msg.data.ToString());
-        OnGameStateUpdated?.Invoke(gameState);
+        Debug.LogError($"❌ WebSocket error: {e.Message}");
+        OnError?.Invoke(e.Message);
     }
     
-    private void HandlePlayerJoined(WebSocketMessage msg)
+    IEnumerator ReconnectCoroutine()
     {
-        var data = JsonConvert.DeserializeObject<Dictionary<string, string>>(msg.data.ToString());
-        OnPlayerJoined?.Invoke(data["playerId"]);
+        reconnectAttempts++;
+        Debug.Log($"🔄 Attempting to reconnect... ({reconnectAttempts}/{maxReconnectAttempts})");
+        
+        yield return new WaitForSeconds(reconnectDelay);
+        
+        if (!isConnected)
+        {
+            Connect();
+        }
     }
-    
-    private void HandleRelicSelected(WebSocketMessage msg)
-    {
-        var data = JsonConvert.DeserializeObject<RelicSelectionData>(msg.data.ToString());
-        OnRelicSelected?.Invoke(data);
-    }
-    
-    private void HandleCardPlayed(WebSocketMessage msg)
-    {
-        var data = JsonConvert.DeserializeObject<CardPlayData>(msg.data.ToString());
-        OnCardPlayed?.Invoke(data);
-    }
-    
-    private void HandleCardSwapped(WebSocketMessage msg)
-    {
-        Debug.Log("Cards swapped");
-        // Handle card swap confirmation
-    }
-    
-    private void HandleBetPlaced(WebSocketMessage msg)
-    {
-        var data = JsonConvert.DeserializeObject<BetData>(msg.data.ToString());
-        OnBetPlaced?.Invoke(data);
-    }
-    
-    private void HandleCardsRevealed(WebSocketMessage msg)
-    {
-        Debug.Log("Cards revealed");
-        // Handle card reveal
-    }
-    
-    private void HandleRoundEnd(WebSocketMessage msg)
-    {
-        Debug.Log("Round ended");
-        // Handle round end
-    }
-    
-    private void HandleError(WebSocketMessage msg)
-    {
-        string error = msg.data?.ToString() ?? "Unknown error";
-        Debug.LogError($"Server error: {error}");
-        OnError?.Invoke(error);
-    }
-    
-    #endregion
-    
-    #region Message Sending
     
     /// <summary>
     /// Send a message to the server
     /// </summary>
     public void SendMessage(string type, object data = null)
     {
-        if (websocket == null || websocket.ReadyState != WebSocketSharp.WebSocketState.Open)
+        if (!isConnected)
         {
-            Debug.LogError("WebSocket is not connected");
+            Debug.LogWarning("❌ Not connected, queuing message");
+            messageQueue.Enqueue(JsonConvert.SerializeObject(new { type, data }));
             return;
         }
         
-        var message = new WebSocketMessage
+        try
         {
-            type = type,
-            data = data,
-            timestamp = DateTime.UtcNow.ToString("o"),
-            playerId = playerId
-        };
-        
-        string json = JsonConvert.SerializeObject(message);
-        
-        if (debugMode)
-        {
-            Debug.Log($"📤 Sending: {json}");
+            var message = new
+            {
+                type = type,
+                data = data,
+                timestamp = DateTime.UtcNow.ToString("o")
+            };
+            
+            string jsonMessage = JsonConvert.SerializeObject(message);
+            websocket.Send(jsonMessage);
+            Debug.Log($"📤 Sent: {type}");
         }
-        
-        websocket.Send(json);
+        catch (Exception e)
+        {
+            Debug.LogError($"❌ Failed to send message: {e.Message}");
+            OnError?.Invoke($"Send error: {e.Message}");
+        }
     }
     
-    private void SendHandshake()
+    /// <summary>
+    /// Join a game
+    /// </summary>
+    public void JoinGame(string gameId = null)
     {
-        SendMessage("handshake", new
+        SendMessage("joinGame", new
         {
-            clientVersion = "1.0.0",
-            platform = "Unity",
-            playerId = SystemInfo.deviceUniqueIdentifier
+            gameId = gameId ?? Guid.NewGuid().ToString(),
+            playerName = "UnityPlayer",
+            timestamp = DateTime.UtcNow.ToString("o")
         });
     }
     
-    #endregion
-    
-    #region Public API
-    
-    public bool IsConnected => websocket != null && websocket.ReadyState == WebSocketSharp.WebSocketState.Open;
-    
-    public void JoinGame(string gameId = null)
-    {
-        this.gameId = gameId;
-        SendMessage("joinGame", new { gameId });
-    }
-    
-    public void SelectRelic(int relicId)
-    {
-        SendMessage("selectRelic", new { relicId, gameId });
-    }
-    
-    public void PlayCard(int cardIndex, int position)
-    {
-        SendMessage("playCard", new { cardIndex, position, gameId });
-    }
-    
-    public void SwapCards(int position1, int position2)
-    {
-        SendMessage("swapCards", new { position1, position2, gameId });
-    }
-    
-    public void PlaceBet(string action, int amount = 0)
-    {
-        SendMessage("placeBet", new { action, amount, gameId });
-    }
-    
+    /// <summary>
+    /// Request current game state
+    /// </summary>
     public void RequestGameState()
     {
-        SendMessage("getGameState", new { gameId });
+        SendMessage("getGameState");
     }
     
-    #endregion
-    
-    #region Utility
-    
-    private void QueueMainThreadAction(Action action)
+    /// <summary>
+    /// Select a relic
+    /// </summary>
+    public void SelectRelic(int relicId)
     {
-        lock (mainThreadActions)
+        SendMessage("selectRelic", new
         {
-            mainThreadActions.Enqueue(action);
-        }
+            relicId = relicId,
+            timestamp = DateTime.UtcNow.ToString("o")
+        });
     }
     
+    /// <summary>
+    /// Play a card
+    /// </summary>
+    public void PlayCard(int cardIndex, int position)
+    {
+        SendMessage("playCard", new
+        {
+            cardIndex = cardIndex,
+            position = position,
+            timestamp = DateTime.UtcNow.ToString("o")
+        });
+    }
+    
+    /// <summary>
+    /// Swap cards
+    /// </summary>
+    public void SwapCards(int card1Index, int card2Index)
+    {
+        SendMessage("swapCards", new
+        {
+            card1Index = card1Index,
+            card2Index = card2Index,
+            timestamp = DateTime.UtcNow.ToString("o")
+        });
+    }
+    
+    /// <summary>
+    /// Place a bet
+    /// </summary>
+    public void PlaceBet(string action, double amount = 0)
+    {
+        SendMessage("placeBet", new
+        {
+            action = action, // RAISE, CALL, FOLD, REVEAL
+            amount = amount,
+            timestamp = DateTime.UtcNow.ToString("o")
+        });
+    }
+    
+    /// <summary>
+    /// Disconnect from server
+    /// </summary>
     public void Disconnect()
     {
+        if (websocket != null && isConnected)
+        {
+            websocket.Close();
+        }
+        
+        isConnected = false;
+        connectionStatus = "Disconnected";
+        reconnectAttempts = 0;
+        
         if (reconnectCoroutine != null)
         {
             StopCoroutine(reconnectCoroutine);
             reconnectCoroutine = null;
         }
         
-        if (websocket != null)
-        {
-            if (websocket.ReadyState == WebSocketSharp.WebSocketState.Open)
-            {
-                websocket.Close();
-            }
-            websocket = null;
-        }
-        
-        Debug.Log("Disconnected from WebSocket server");
+        OnConnectionChanged?.Invoke(false);
     }
     
-    private IEnumerator ReconnectCoroutine()
+    void HandleGameStateUpdate(Dictionary<string, object> messageData)
     {
-        while (!IsConnected && autoReconnect)
+        try
         {
-            yield return new WaitForSeconds(reconnectDelay);
-            Debug.Log("Attempting to reconnect...");
-            Connect();
+            if (messageData.ContainsKey("data"))
+            {
+                var gameStateJson = JsonConvert.SerializeObject(messageData["data"]);
+                var gameState = JsonConvert.DeserializeObject<GameStateUpdate>(gameStateJson);
+                
+                Debug.Log($"🎮 Game state updated: Phase={gameState.phase}, Round={gameState.round}, Pot={gameState.pot}");
+                OnGameStateUpdated?.Invoke(gameState);
+            }
         }
-        reconnectCoroutine = null;
+        catch (Exception e)
+        {
+            Debug.LogError($"❌ Failed to parse game state: {e.Message}");
+        }
+    }
+    
+    void HandleErrorMessage(Dictionary<string, object> messageData)
+    {
+        if (messageData.ContainsKey("data"))
+        {
+            string errorMessage = messageData["data"].ToString();
+            Debug.LogError($"❌ Server error: {errorMessage}");
+            OnError?.Invoke(errorMessage);
+        }
+    }
+    
+    void Update()
+    {
+        // Process queued messages when connected
+        if (isConnected && messageQueue.Count > 0)
+        {
+            while (messageQueue.Count > 0)
+            {
+                string queuedMessage = messageQueue.Dequeue();
+                try
+                {
+                    websocket.Send(queuedMessage);
+                    Debug.Log("📤 Sent queued message");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"❌ Failed to send queued message: {e.Message}");
+                }
+            }
+        }
     }
     
     void OnDestroy()
     {
         Disconnect();
+        
+        if (websocket != null)
+        {
+            websocket.OnOpen -= OnWebSocketOpen;
+            websocket.OnMessage -= OnWebSocketMessage;
+            websocket.OnClose -= OnWebSocketClose;
+            websocket.OnError -= OnWebSocketError;
+        }
     }
-    
-    #endregion
-    
-    #region Data Classes
-    
-    [Serializable]
-    public class WebSocketMessage
-    {
-        public string type;
-        public object data;
-        public string timestamp;
-        public string playerId;
-    }
-    
-    [Serializable]
-    public class GameStateUpdate
-    {
-        public string gameId;
-        public string phase;
-        public int round;
-        public List<PlayerState> players;
-        public int pot;
-        public int currentBet;
-        public string currentPlayer;
-    }
-    
-    [Serializable]
-    public class PlayerState
-    {
-        public string playerId;
-        public int hearts;
-        public int chips;
-        public string status;
-        public int bet;
-    }
-    
-    [Serializable]
-    public class RelicSelectionData
-    {
-        public string playerId;
-        public int relicId;
-        public string relicName;
-    }
-    
-    [Serializable]
-    public class CardPlayData
-    {
-        public string playerId;
-        public int cardIndex;
-        public int position;
-    }
-    
-    [Serializable]
-    public class BetData
-    {
-        public string playerId;
-        public string action;
-        public int amount;
-        public int newPot;
-    }
-    
-    #endregion
 }
